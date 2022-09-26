@@ -1,5 +1,5 @@
 ---
-title: "Sandbox"
+title: "Diet and Sleep"
 author: "Waveley Qiu"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: pdf_document
@@ -7,7 +7,6 @@ header-includes:
   - \usepackage{mathrsfs}
   - \usepackage{amsfonts}  
 ---
-
 
 ```{r setup, include=FALSE}
 set.seed(20220417)
@@ -47,19 +46,42 @@ scale_colour_discrete = scale_colour_viridis_d
 scale_fill_discrete   = scale_fill_viridis_d
 ```
 
-## Setup
+## Background
 
-```{r}
+This study seeks to assess the bi-directional association between the quality of one's sleep and different components of one's diet. 
+
+## Data
+
+Data from CM and DQ were combined for the purpose of this study. Two sets of data were collected, one for each direction of the analysis. In order to establish a temporal order, the event associated with the outcome variable was ensured to have occurred after the event associated with the predictor variable -- for example, to assess the influence a subject's diet may have had on their sleep, the investigators recorded what they ate before they went to sleep. 
+
+For the purpose of this analysis, both datasets will be subsetted to just records that indicate the "Aligned" condition.
+
+## Variables
+
+In investigating the influence that one's diet may have on their sleep, we are interested in the following predictors: energy, food weight (no beverages), energy density, protein, fat, corbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, zinc, vitamin B6, vitamin B12, saturated fat, unsaturated fat, vitamin D, fruits, vegetables, fruits and vegetables, eggs, nuts, dairy, and added sugar. We are interested in the following outcome variables that measure sleep: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index.
+
+In investigating the influence that one's sleep may have on their diet, we are interested in the following predictors: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index. The following variables will serve as predictors: energy, food weight (no beverages), energy density, protein, fat, corbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, saturated fat, unsaturated fat,fruits, vegetables, fruits and vegetables, eggs, dairy, and added sugar. 
+
+In both analysis directions, we will also assess the significance of age, sex, and BMI as covariates
+
+## Methods
+
+We will construct linear mixed effect models to conduct a preliminary assessment of the relationships between all variables of interest. First, we will regress the outcome variable of interest on one predictor and the three covariates, adding a random intercept for subject ID. We will then evaluate the significance of the coefficients associated with each of the three covariates. If the coefficient is determined to not be significant (i.e., p > 0.05), it will be removed from the model. The truncated model will then be run again and its result saved.
+
+### Diet and Sleep
+
+The following table presents the results of regressing sleep outcome variables on diet predictors:
+
+```{r, echo = FALSE}
 diet_sleep <- readxl::read_excel("data/CM + DQ Study Diet and Sleep_8.24.2022_HB.xlsx", sheet = "Diet-sleep") %>%
   janitor::clean_names() %>%
   filter(
     condition == "Aligned"
+  ) %>%
+  mutate(
+    sex = as.factor(sex)
   )
-```
 
-## Diet and Sleep
-
-```{r}
 outs1 <-
   diet_sleep %>%
   select(
@@ -102,7 +124,7 @@ loop_models <- function(outcomes = outs, predictors = preds, covariates = covs){
         pred_name <- predictors[,i] %>% names()
         outcome_name <- outcomes[,j] %>% names()
         
-        print(paste0(outcome_name, " vs ", pred_name))
+       # print(paste0(outcome_name, " vs ", pred_name))
         
         cur_outcome <- outcomes %>% pull(outcome_name)
         cur_predictor <- predictors %>% pull(pred_name)
@@ -118,7 +140,8 @@ loop_models <- function(outcomes = outs, predictors = preds, covariates = covs){
         first_mem <- lmer(cur_formula)
         saved_sum <- first_mem %>% summary()
         p_vals <- saved_sum$coefficients[,5] # p-value column
-        save_covs <- p_vals[p_vals < 0.05] %>% names() # only keep covariates with p-value < 0.05
+        save_covs <- p_vals[p_vals < 0.05] %>% names()
+        save_covs <- save_covs %>% str_replace_all("sex2", "sex") # only keep covariates with p-value < 0.05
         updated_cov_vec <- save_covs[!(save_covs %in% c("(Intercept)"))] # dont want intercept
         
         fin_formula <-
@@ -158,7 +181,7 @@ new_names <-
 new_vals <- 
   mod_sum %>% 
   unlist() %>%
-  round(digits = 7) 
+  round(digits = 4) 
 
 rhs <- tibble(
   name = new_names,
@@ -195,17 +218,24 @@ diet_sleep_models <- loop_models(outs1, preds1, covs1)
 diet_sleep_output <- do_write_mods(diet_sleep_models) %>%
   mutate(predictor = predictor %>% toupper(),
          outcome = outcome %>% toupper()) %>%
-  relocate(outcome)
+  relocate(outcome) %>% 
+  arrange(outcome, predictor)
 
 diet_sleep_output %>% knitr::kable(col.names = c("Outcome", "Predictor", "Model"))
 ```
 
+### Sleep and Diet
 
-```{r}
+The following table presents the results of regressing diet outcome variables on sleep predictors:
+
+```{r, echo = FALSE}
 sleep_diet <- readxl::read_excel("data/CM + DQ Study Diet and Sleep_8.24.2022_HB.xlsx", sheet = "Sleep-diet") %>%
   janitor::clean_names() %>%
   filter(
     condition == "Aligned"
+  ) %>% 
+  mutate(
+    sex = as.factor(sex)
   )
 
 outs2 <-
@@ -241,7 +271,8 @@ sleep_diet_output <- do_write_mods(sleep_diet_models) %>%
     predictor = predictor %>% toupper(),
     outcome = outcome %>% toupper()
   ) %>%
-  relocate(outcome)
+  relocate(outcome) %>%
+  arrange(outcome, predictor)
 
 sleep_diet_output %>% knitr::kable(col.names = c("Outcome", "Predictor", "Model"))
 ```
