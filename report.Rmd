@@ -64,9 +64,13 @@ In investigating the influence that one's sleep may have on their diet, we are i
 
 In both analysis directions, we will also assess the significance of age, sex, and BMI as covariates
 
-## Methods
+## Methodology
 
 We will construct linear mixed effect models to conduct a preliminary assessment of the relationships between all variables of interest. First, we will regress the outcome variable of interest on one predictor and the three covariates, adding a random intercept for subject ID. We will then evaluate the significance of the coefficients associated with each of the three covariates. If the coefficient is determined to not be significant (i.e., p > 0.05), it will be removed from the model. The truncated model will then be run again and its result saved.
+
+\newpage
+
+## Results
 
 ### Diet and Sleep
 
@@ -218,11 +222,12 @@ diet_sleep_models <- loop_models(outs1, preds1, covs1)
 diet_sleep_output <- do_write_mods(diet_sleep_models) %>%
   mutate(predictor = predictor %>% toupper(),
          outcome = outcome %>% toupper()) %>%
-  relocate(outcome) %>% 
-  arrange(outcome, predictor)
+  relocate(outcome)
 
-diet_sleep_output %>% knitr::kable(col.names = c("Outcome", "Predictor", "Model"))
+diet_sleep_output %>% knitr::kable(col.names = c("Outcome", "Predictor", "Model"), "simple")
 ```
+
+\newpage
 
 ### Sleep and Diet
 
@@ -271,9 +276,14 @@ sleep_diet_output <- do_write_mods(sleep_diet_models) %>%
     predictor = predictor %>% toupper(),
     outcome = outcome %>% toupper()
   ) %>%
-  relocate(outcome) %>%
-  arrange(outcome, predictor)
-
-sleep_diet_output %>% knitr::kable(col.names = c("Outcome", "Predictor", "Model"))
+  relocate(outcome)
+sleep_diet_output %>% knitr::kable(col.names = c("Outcome", "Predictor", "Model"), "simple")
 ```
+
+\newpage
+
+## GitHub Repository
+
+All code for this report can be found in [this Github repository](https://github.com/waveley/diet_sleep).
+
 
