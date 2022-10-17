@@ -2,7 +2,7 @@
 title: "Diet and Sleep"
 author: "Waveley Qiu"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
-output: pdf_document
+output: word_document
 header-includes:
   - \usepackage{mathrsfs}
   - \usepackage{amsfonts}  
@@ -13,7 +13,7 @@ set.seed(20220417)
 library(tidyverse)
 library(lme4)
 library(lmerTest)
-
+library(kableExtra)
 # set knitr defaults
 knitr::opts_chunk$set(
   echo = TRUE,
@@ -58,11 +58,11 @@ For the purpose of this analysis, both datasets will be subsetted to just record
 
 ## Variables
 
-In investigating the influence that one's diet may have on their sleep, we are interested in the following predictors: energy, food weight (no beverages), energy density, protein, fat, corbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, zinc, vitamin B6, vitamin B12, saturated fat, unsaturated fat, vitamin D, fruits, vegetables, fruits and vegetables, eggs, nuts, dairy, and added sugar. We are interested in the following outcome variables that measure sleep: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index.
+In investigating the influence that one's diet may have on their sleep, we are interested in the following predictors: energy, food weight (no beverages), energy density, protein, fat, carbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, zinc, vitamin B6, vitamin B12, saturated fat, unsaturated fat, vitamin D, fruits, vegetables, fruits and vegetables, eggs, nuts, dairy, and added sugar. We are interested in the following outcome variables that measure sleep: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index.
 
-In investigating the influence that one's sleep may have on their diet, we are interested in the following predictors: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index. The following variables will serve as predictors: energy, food weight (no beverages), energy density, protein, fat, corbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, saturated fat, unsaturated fat,fruits, vegetables, fruits and vegetables, eggs, dairy, and added sugar. 
+In investigating the influence that one's sleep may have on their diet, we are interested in the following predictors: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index. The following variables will serve as predictors: energy, food weight (no beverages), energy density, protein, fat, carbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, saturated fat, unsaturated fat,fruits, vegetables, fruits and vegetables, eggs, dairy, and added sugar. 
 
-In both analysis directions, we will also assess the significance of age, sex, and BMI as covariates
+In both analysis directions, we will also assess the significance of age, sex, and BMI as covariates. Sex is analyzed as a categorical covariate, while age and BMI are analyzed as continuous covariates.
 
 ## Methodology
 
@@ -112,7 +112,7 @@ preds1 <-
     added_sugar
   )
 
-loop_models <- function(outcomes = outs, predictors = preds, covariates = covs){
+loop_models <- function(outcomes = outs1, predictors = preds1, covariates = covs1){
       
     outcome_tib <- 
       tibble()
@@ -154,15 +154,42 @@ loop_models <- function(outcomes = outs, predictors = preds, covariates = covs){
                  "cur_predictor + (1 | id)"
                  )
         final_mem <- lmer(fin_formula)
+       # tidy_mem <- final_mem %>% texreg()
         mod_sum <- summary(final_mem)
+        
+        # save model summary output in list
+        mod_sum_output <- capture.output(summary(final_mem))
+        
+        # extract relevant portions of summary output
+        first_ind <- mod_sum_output %>% match("Fixed effects:")
+        last_ind <- mod_sum_output %>% match("Correlation of Fixed Effects:")
+        
+        mod_sum_output_trunc <-
+          mod_sum_output[(which(first_ind == 1) + 1):(which(last_ind == 1) - 2)]
+        
+        # replace "cur_predictor" with current predictor name
+         
+         
+        mod_sum_pred_row <- mod_sum_output_trunc %>% str_locate("cur_predictor")
+        mod_sum_output_trunc[which(mod_sum_pred_row[,1] == 1)] <- 
+          str_replace(mod_sum_output_trunc[which(mod_sum_pred_row[,1] == 1)],
+                      "cur_predictor",
+                      str_trunc(paste0(pred_name, "             "), 13, side = "right", ellipsis = ""))
+        
         mod_sum_coef <- mod_sum$coefficients
         mod_estimates <- mod_sum_coef[,1]
+        pred_p_val <- mod_sum_coef["cur_predictor", 5]
+        
         cur_tib <-
           tibble(
             predictor = pred_name,
             outcome = outcome_name,
+            model_sum = list(mod_sum_output_trunc),
             model_summary = list(mod_sum_coef),
-            model_estimates = list(mod_estimates)
+            model_estimates = list(mod_estimates),
+            predictor_pval = pred_p_val %>% round(digits = 3),
+            sig = if_else(predictor_pval < 0.05, "***", "")
+            
           )
         
         outcome_tib <- outcome_tib %>% bind_rows(cur_tib)
@@ -174,35 +201,35 @@ loop_models <- function(outcomes = outs, predictors = preds, covariates = covs){
 write_mod <- function(pred = test$predictor, 
                       out = test$outcome, 
                       mod_sum = test$model_estimates){
-
-new_names <- 
-  mod_sum %>% 
-  unlist() %>%
-  names() %>% 
-  str_replace_all("cur_predictor", pred) %>%
-  str_replace_all('\\(Intercept\\)',"") %>% toupper()
-
-new_vals <- 
-  mod_sum %>% 
-  unlist() %>%
-  round(digits = 4) 
-
-rhs <- tibble(
-  name = new_names,
-  vals = new_vals
-) %>%
-  mutate(
-    sign = sign(vals),
-    new_vals = abs(vals),
-    new_term = ifelse(name == "", 
-                      ifelse(sign == 1, paste(new_vals), paste("-", new_vals)), 
-                     ifelse(sign == 1, 
-                            paste0(" + ", new_vals, "(", name, ")"), 
-                            paste0(" - ", new_vals, "(", name, ")")))
-  ) %>% pull(new_term) %>% paste(collapse = "")
-
-lhs <- out %>% toupper()
-fin_mod <- paste0(lhs, " = ", rhs)
+  
+  new_names <- 
+    mod_sum %>% 
+    unlist() %>%
+    names() %>% 
+    str_replace_all("cur_predictor", pred) %>%
+    str_replace_all('\\(Intercept\\)',"") %>% toupper()
+  
+  new_vals <- 
+    mod_sum %>% 
+    unlist() %>%
+    round(digits = 4) 
+  
+  rhs <- tibble(
+    name = new_names,
+    vals = new_vals
+  ) %>%
+    mutate(
+      sign = sign(vals),
+      new_vals = abs(vals),
+      new_term = ifelse(name == "", 
+                        ifelse(sign == 1, paste(new_vals), paste("-", new_vals)), 
+                       ifelse(sign == 1, 
+                              paste0(" + ", new_vals, "(", name, ")"), 
+                              paste0(" - ", new_vals, "(", name, ")")))
+    ) %>% pull(new_term) %>% paste(collapse = "")
+  
+  lhs <- out %>% toupper()
+  fin_mod <- paste0(lhs, " = ", rhs)
 return(fin_mod)
 }
 
@@ -210,21 +237,22 @@ do_write_mods <- function(df) {
   
  fin_df <- df %>% 
   mutate(
-    fin_mods = pmap(list(predictor, outcome, model_estimates), write_mod)
+    fin_mods = pmap(list(predictor, outcome, model_sum), new_write_mods)
   ) %>%
-  select(predictor, outcome, fin_mods) %>%
+  select(predictor, outcome, fin_mods, predictor_pval, sig) %>%
   unnest(fin_mods)
  
  return(fin_df)
 }
 
 diet_sleep_models <- loop_models(outs1, preds1, covs1)
-diet_sleep_output <- do_write_mods(diet_sleep_models) %>%
-  mutate(predictor = predictor %>% toupper(),
-         outcome = outcome %>% toupper()) %>%
-  relocate(outcome)
 
-diet_sleep_output %>% knitr::kable(col.names = c("Outcome", "Predictor", "Model"), "simple")
+for (i in 1:nrow(diet_sleep_models)) {
+  cur_df <- diet_sleep_models[i,]
+  writeLines(paste0("Model ", i, ": ", cur_df$outcome, " vs. ", cur_df$predictor))
+  writeLines(unlist(lapply(cur_df$model_sum, paste)))
+  writeLines("\n")
+}
 ```
 
 \newpage
@@ -271,13 +299,13 @@ preds2 <-
   )
 
 sleep_diet_models <- loop_models(outs2, preds2, covs2)
-sleep_diet_output <- do_write_mods(sleep_diet_models) %>%
-  mutate(
-    predictor = predictor %>% toupper(),
-    outcome = outcome %>% toupper()
-  ) %>%
-  relocate(outcome)
-sleep_diet_output %>% knitr::kable(col.names = c("Outcome", "Predictor", "Model"), "simple")
+
+for (i in 1:nrow(sleep_diet_models)) {
+  cur_df <- sleep_diet_models[i,]
+  writeLines(paste0("Model ", i, ": ", cur_df$outcome, " vs. ", cur_df$predictor))
+  writeLines(unlist(lapply(cur_df$model_sum, paste)))
+  writeLines("\n")
+}
 ```
 
 \newpage
