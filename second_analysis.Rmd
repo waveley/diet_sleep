@@ -1,0 +1,320 @@
+---
+title: "Diet and Sleep vs. Condition"
+author: "Waveley Qiu"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: word_document
+header-includes:
+  - \usepackage{mathrsfs}
+  - \usepackage{amsfonts}  
+---
+
+```{r setup, include=FALSE}
+set.seed(20220417)
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(kableExtra)
+# set knitr defaults
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center",
+  fig.width = 6,
+  fig.asp   = .6,
+  out.width = "90%",
+  cache = TRUE
+)
+
+# set theme defaults
+theme_set(
+  theme_bw() +
+    theme(
+      legend.position = "bottom",
+      plot.title    = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5),
+      plot.caption  = element_text(hjust = 0.0)
+    )
+)
+
+# set color scale defaults
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill   = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete   = scale_fill_viridis_d
+```
+
+## Background
+
+This analysis seeks to understand the influence that alignment condition has on two categories of lifestyle outcomes: dietary intake and sleep measures.
+
+## Data
+
+There are 8 subjects in this study. All subjects have complete records for all outcome measures of interest. 
+
+In assessing the influence that alignment condition has on dietary intake, each subject was measured at two timepoints: week 3 and week 6. As each subject underwent both alignment conditions (aligned and misaligned), each subject had four total records in that round of data collection.
+
+In assessing the influence that alignment condition has on dietary intake, each subject was measured at six timepoints: weeks 1, 2, 3, 4, 5, and 6. As each subject underwent both alignment conditions (aligned and misaligned), each subject had twelve total records in that round of data collection.
+
+## Variables
+
+The predictors in both arms of this analysis (diet outcomes and sleep outcomes) are the same -- we are interested in one's alignment condition (aligned/misaligned), the week of measurement, as well as the interaction of condition and week. In this analysis, week is treated as a continuous variable.
+
+In investigating the influence that one's alignment condition may have on their sleep, we are interested in the following outcome variables: food weight, energy, food weight (no beverages), energy (no beverages), energy density, protein, fat, carbohydrate, plant protein, animal protein, sugar, fiber, calcium, magnesium, potassium, sodium, zinc, vitamin C, vitamin B6, folate, vitamin B12, saturated fat, monounsaturated fat, polyunsaturated fat, unsaturated fat, vitamin D, fruits, vegetables, fruits and vegetables, eggs, nuts, dairy, and added sugar. 
+
+In investigating the influence that one's alignment condition may have on their diet, we are interested in the following predictors: latency, efficiency, TIB, TST, WASO, number of awakenings, awakening length, movement index, SFI, and fragmentation index.
+
+## Methodology
+
+For both portions of this analysis, linear mixed effect models, with random intercepts for each subject, will be constructed to regress each outcome variable in turn on the following predictors: condition, week, the interaction of condition and week. 
+
+In all models constructed, phase (coded as a factor variable, taking in values 1 and 2) will be included in the model if it is deemed to be significant. In addition, the diet portion of this study, energy (recorded as the variable "en" in the dataset) will be added as a predictor in all models, excluding the model in which energy itself is the outcome. 
+
+\newpage
+
+## Results
+
+### Diet and Condition
+
+The results of regressing diet outcome variables on condition, week, the interaction of condition and week, energy (if applicable), and phase (if determined to be a significant predictor) are as follows:
+
+```{r, echo = FALSE}
+diet <- readxl::read_excel("data/CM Study Diet and Sleep_10.5.2022_HB.xlsx", sheet = "Diet") %>%
+  janitor::clean_names() %>%
+  mutate(
+    sex = as.factor(sex),
+    phase = as.factor(phase)
+  )
+
+outs1 <-
+  diet %>%
+  select(
+    food_wt_ttl, en, food_wt_f, en_food, 
+    ed, prot, fat, cho, prot_plant,
+    prot_ani, sugar, fiber, ca, mg, k, 
+    na, zn, vit_c, vit_b6, folate,
+    vit_b12, sfa, mufa, pufa, ufa, vit_d, 
+    fruit, veg, f_v, egg, nuts, dairy, 
+    added_sugar
+  )
+
+preds1 <-
+  diet %>%
+  select(
+    condition, week, phase, en, id
+  )
+
+loop_diet_models <- function(outcomes = outs1, preds = preds1){
+      
+    condition <- preds$condition
+    week <- preds$week
+    phase <- preds$phase
+    en <- preds$en
+    id <- preds$id
+    
+    outcome_tib <- 
+      tibble()
+    
+      for (j in 1:ncol(outcomes)) {
+        
+      outcome_name <- outcomes[,j] %>% names()
+        
+        #print(paste0(outcome_name))
+        
+        cur_outcome <- outcomes %>% pull(outcome_name)
+
+        if ("en" %in% outcome_name) {
+          cur_formula <- "cur_outcome ~ condition + week + condition*week + phase + (1 | id)"
+        }
+        else if (!("en" %in% outcome_name)) {
+          cur_formula <- "cur_outcome ~ condition + week + condition*week + en + phase + (1 | id)"
+        }
+
+        first_mem <- lmer(cur_formula)
+        saved_sum <- first_mem %>% summary()
+        p_vals <- saved_sum$coefficients[,5] # p-value column
+        save_covs <- p_vals[p_vals < 0.05] %>% names() # want to know if phase is significant
+
+        fin_formula <- cur_formula
+        
+        if (!("phase2" %in% save_covs) & "en" %in% outcome_name) {
+          fin_formula <- "cur_outcome ~ condition + week + condition*week + (1 | id)"
+        }
+        else if (!("phase2" %in% save_covs) & !("en" %in% outcome_name)) {
+          fin_formula <- "cur_outcome ~ condition + week + condition*week + en + (1 | id)"
+        }
+        
+        #print(fin_formula)
+        final_mem <- lmer(fin_formula)
+        mod_sum <- summary(final_mem)
+        
+        # save model summary output in list
+        mod_sum_output <- capture.output(summary(final_mem))
+
+        # extract relevant portions of summary output
+        first_ind <- mod_sum_output %>% match("Fixed effects:")
+        last_ind <- mod_sum_output %>% match("Correlation of Fixed Effects:")
+        
+        mod_sum_output_trunc <-
+          mod_sum_output[(which(first_ind == 1) + 1):(which(last_ind == 1) - 2)]
+        
+        mod_sum_coef <- mod_sum$coefficients
+        mod_estimates <- mod_sum_coef[,1]
+
+        cur_tib <-
+          tibble(
+            outcome = outcome_name,
+            model_sum = list(mod_sum_output_trunc)
+            
+          )
+        
+        outcome_tib <- outcome_tib %>% bind_rows(cur_tib)
+    }
+  return(outcome_tib)
+}
+
+write_mod <- function(out, 
+                      mod_sum){
+  
+  new_vals <- 
+    mod_sum %>% 
+    unlist() %>%
+    round(digits = 4) 
+  
+  rhs <- tibble(
+    name = new_names,
+    vals = new_vals
+  ) %>%
+    mutate(
+      sign = sign(vals),
+      new_vals = abs(vals),
+      new_term = ifelse(name == "", 
+                        ifelse(sign == 1, paste(new_vals), paste("-", new_vals)), 
+                       ifelse(sign == 1, 
+                              paste0(" + ", new_vals, "(", name, ")"), 
+                              paste0(" - ", new_vals, "(", name, ")")))
+    ) %>% pull(new_term) %>% paste(collapse = "")
+  
+  lhs <- out %>% toupper()
+  fin_mod <- paste0(lhs, " = ", rhs)
+return(fin_mod)
+}
+
+diet_models <- loop_diet_models(outs1, preds1)
+
+for (i in 1:nrow(diet_models)) {
+  cur_df <- diet_models[i,]
+  writeLines(paste0("Model ", i, ": ", cur_df$outcome, " vs. condition"))
+  writeLines(unlist(lapply(cur_df$model_sum, paste)))
+  writeLines("\n")
+}
+```
+
+\newpage
+
+## Sleep and Condition
+
+The results of regressing sleep outcome variables on condition, week, the interaction of condition and week, and phase (if determined to be a significant predictor) are as follows:
+
+```{r, echo = FALSE}
+sleep <- readxl::read_excel("data/CM Study Diet and Sleep_10.5.2022_HB.xlsx", sheet = "Sleep") %>%
+  janitor::clean_names() %>%
+  mutate(
+    sex = as.factor(sex),
+    phase = as.factor(phase)
+  )
+
+outs2 <-
+  sleep %>%
+  select(
+    latency, efficiency, tib, tst, waso, 
+    number_of_awakenings, awakening_length, 
+    movement_index, sfi, fragmentation_index
+  )
+
+preds2 <-
+  sleep %>%
+  select(
+    condition, week, phase, id
+  )
+
+loop_sleep_models <- function(outcomes = outs2, preds = preds2){
+      
+    condition <- preds$condition
+    week <- preds$week
+    phase <- preds$phase
+    id <- preds$id
+    
+    outcome_tib <- 
+      tibble()
+    
+      for (j in 1:ncol(outcomes)) {
+        
+        outcome_name <- outcomes[,j] %>% names()
+        
+        #print(paste0(outcome_name))
+        
+        cur_outcome <- outcomes %>% pull(outcome_name)
+        cur_formula <- "cur_outcome ~ condition + week + condition*week + phase + (1 | id)"
+        
+        #print(cur_formula)
+        
+        first_mem <- lmer(cur_formula)
+        saved_sum <- first_mem %>% summary()
+        p_vals <- saved_sum$coefficients[,5] # p-value column
+        save_covs <- p_vals[p_vals < 0.05] %>% names() # want to know if phase is significant
+        
+        fin_formula <- cur_formula
+
+        if (!("phase2" %in% save_covs)) {
+          fin_formula <- "cur_outcome ~ condition + week + condition*week + (1 | id)"
+        }
+        
+        #print(fin_formula)
+        final_mem <- lmer(fin_formula)
+        mod_sum <- summary(final_mem)
+        
+        # save model summary output in list
+        mod_sum_output <- capture.output(summary(final_mem))
+
+        # extract relevant portions of summary output
+        first_ind <- mod_sum_output %>% match("Fixed effects:")
+        last_ind <- mod_sum_output %>% match("Correlation of Fixed Effects:")
+        
+        mod_sum_output_trunc <-
+          mod_sum_output[(which(first_ind == 1) + 1):(which(last_ind == 1) - 2)]
+        
+        mod_sum_coef <- mod_sum$coefficients
+        mod_estimates <- mod_sum_coef[,1]
+
+        cur_tib <-
+          tibble(
+            outcome = outcome_name,
+            model_sum = list(mod_sum_output_trunc)
+            
+          )
+        
+        outcome_tib <- outcome_tib %>% bind_rows(cur_tib)
+    }
+  return(outcome_tib)
+}
+
+sleep_models <- loop_sleep_models(outs2, preds2)
+
+for (i in 1:nrow(sleep_models)) {
+  cur_df <- sleep_models[i,]
+  writeLines(paste0("Model ", i, ": ", cur_df$outcome, " vs. condition"))
+  writeLines(unlist(lapply(cur_df$model_sum, paste)))
+  writeLines("\n")
+}
+```
+
+\newpage
+
+## GitHub Repository
+
+All code for this report can be found in [this Github repository](https://github.com/waveley/diet_sleep).
+
+

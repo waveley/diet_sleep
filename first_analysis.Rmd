@@ -2,7 +2,7 @@
 title: "Diet and Sleep"
 author: "Waveley Qiu"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
-output: word_document
+output: pdf_document
 header-includes:
   - \usepackage{mathrsfs}
   - \usepackage{amsfonts}  
@@ -60,7 +60,7 @@ For the purpose of this analysis, both datasets will be subsetted to just record
 
 In investigating the influence that one's diet may have on their sleep, we are interested in the following predictors: energy, food weight (no beverages), energy density, protein, fat, carbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, zinc, vitamin B6, vitamin B12, saturated fat, unsaturated fat, vitamin D, fruits, vegetables, fruits and vegetables, eggs, nuts, dairy, and added sugar. We are interested in the following outcome variables that measure sleep: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index.
 
-In investigating the influence that one's sleep may have on their diet, we are interested in the following predictors: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index. The following variables will serve as predictors: energy, food weight (no beverages), energy density, protein, fat, carbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, saturated fat, unsaturated fat,fruits, vegetables, fruits and vegetables, eggs, dairy, and added sugar. 
+In investigating the influence that one's sleep may have on their diet, we are interested in the following predictors: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index. The following variables will serve as predictors: energy, food weight (no beverages), energy density, protein, fat, carbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, saturated fat, unsaturated fat, fruits, vegetables, fruits and vegetables, eggs, dairy, and added sugar. 
 
 In both analysis directions, we will also assess the significance of age, sex, and BMI as covariates. Sex is analyzed as a categorical covariate, while age and BMI are analyzed as continuous covariates.
 
@@ -77,7 +77,7 @@ We will construct linear mixed effect models to conduct a preliminary assessment
 The following table presents the results of regressing sleep outcome variables on diet predictors:
 
 ```{r, echo = FALSE}
-diet_sleep <- readxl::read_excel("data/CM + DQ Study Diet and Sleep_8.24.2022_HB.xlsx", sheet = "Diet-sleep") %>%
+diet_sleep <- readxl::read_excel("data/CM + DQ Study Diet and Sleep_Revised_10.5.2022.xlsx", sheet = "Diet-sleep") %>%
   janitor::clean_names() %>%
   filter(
     condition == "Aligned"
