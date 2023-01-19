@@ -1,0 +1,326 @@
+---
+title: "Diet and Sleep"
+author: "Waveley Qiu"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: pdf_document
+header-includes:
+  - \usepackage{mathrsfs}
+  - \usepackage{amsfonts}  
+---
+
+```{r setup, include=FALSE}
+set.seed(20220417)
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(kableExtra)
+# set knitr defaults
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center",
+  fig.width = 6,
+  fig.asp   = .6,
+  out.width = "90%",
+  cache = TRUE
+)
+
+# set theme defaults
+theme_set(
+  theme_bw() +
+    theme(
+      legend.position = "bottom",
+      plot.title    = element_text(hjust = 0.5),
+      plot.subtitle = element_text(hjust = 0.5),
+      plot.caption  = element_text(hjust = 0.0)
+    )
+)
+
+# set color scale defaults
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill   = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete   = scale_fill_viridis_d
+```
+
+## Background
+
+This study seeks to assess the bi-directional association between the quality of one's sleep and different components of one's diet. 
+
+## Data
+
+Data from CM and DQ were combined for the purpose of this study. Two sets of data were collected, one for each direction of the analysis. In order to establish a temporal order, the event associated with the outcome variable was ensured to have occurred after the event associated with the predictor variable -- for example, to assess the influence a subject's diet may have had on their sleep, the investigators recorded what they ate before they went to sleep. 
+
+For the purpose of this analysis, both datasets will be subsetted to just records that indicate the "Aligned" condition.
+
+## Variables
+
+In investigating the influence that one's diet may have on their sleep, we are interested in the following predictors: energy, food weight (no beverages), energy density, protein, fat, carbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, zinc, vitamin B6, vitamin B12, saturated fat, unsaturated fat, vitamin D, fruits, vegetables, fruits and vegetables, eggs, nuts, dairy, and added sugar. We are interested in the following outcome variables that measure sleep: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index.
+
+In investigating the influence that one's sleep may have on their diet, we are interested in the following predictors: sleep efficiency, total sleep time, wake after sleep onset, and sleep fragmentation index. The following variables will serve as predictors: energy, food weight (no beverages), energy density, protein, fat, carbohydrate, plant protein, animal protein, fiber, calcium, magnesium, sodium, saturated fat, unsaturated fat, fruits, vegetables, fruits and vegetables, eggs, dairy, and added sugar. 
+
+In both analysis directions, we will also assess the significance of age, sex, and BMI as covariates. Sex is analyzed as a categorical covariate, while age and BMI are analyzed as continuous covariates.
+
+## Methodology
+
+We will construct linear mixed effect models to conduct a preliminary assessment of the relationships between all variables of interest. First, we will regress the outcome variable of interest on one predictor and the three covariates, adding a random intercept for subject ID. We will then evaluate the significance of the coefficients associated with each of the three covariates. If the coefficient is determined to not be significant (i.e., p > 0.05), it will be removed from the model. The truncated model will then be run again and its result saved.
+
+\newpage
+
+## Results
+
+### Diet and Sleep
+
+The following table presents the results of regressing sleep outcome variables on diet predictors:
+
+```{r, echo = FALSE}
+diet_sleep <- readxl::read_excel("data/CM + DQ Study Diet and Sleep_Added Diet Variables and HEI_12.14.2022_with_hei.xlsx", sheet = "Diet-sleep") %>%
+  janitor::clean_names() %>%
+  filter(
+    condition == "Aligned"
+  ) %>%
+  mutate(
+    sex = as.factor(sex)
+  )
+
+outs1 <-
+  diet_sleep %>%
+  select(
+    se,
+    tst,
+    waso, 
+    sfi
+  )
+covs1 <-
+  diet_sleep %>%
+  select(
+    sex, age, bmi, id
+  )
+preds1 <- 
+  diet_sleep %>%
+  select(
+    kcal, 
+    #food_wt_f, 
+    #ed, 
+    prot, 
+    #fat, 
+    chole, 
+    pf_soy, pf_nutsds, pf_mps_total, fibe,
+    calc, magn, sodi, zinc, vb6, 
+    vb12, 
+    #sfa, ufa, 
+    #vit_d, 
+    fruit, veg, f_v,
+    egg, nuts, dairy, 
+    added_sugar
+  )
+
+#food_wt_f, energy density not available in new data
+#sfa and ufa replaced with sfa/ufa ratio
+
+loop_models <- function(outcomes = outs1, predictors = preds1, covariates = covs1){
+      
+    outcome_tib <- 
+      tibble()
+    
+    age <- covariates$age
+    sex <- covariates$sex
+    bmi <- covariates$bmi
+    id <- covariates$id
+    
+    for (i in 1:ncol(predictors)) {
+      for (j in 1:ncol(outcomes)) {
+        
+        pred_name <- predictors[,i] %>% names()
+        outcome_name <- outcomes[,j] %>% names()
+        
+       # print(paste0(outcome_name, " vs ", pred_name))
+        
+        cur_outcome <- outcomes %>% pull(outcome_name)
+        cur_predictor <- predictors %>% pull(pred_name)
+        
+        cur_cov_vec <- c("age", "sex", "bmi") # all covariates 
+        
+        cur_formula <-
+          paste0("cur_outcome ~ ", 
+                 paste0(cur_cov_vec, sep = " + ", collapse = ""),
+                 "cur_predictor + (1 | id)"
+                 )
+        
+        first_mem <- lmer(cur_formula)
+        saved_sum <- first_mem %>% summary()
+        p_vals <- saved_sum$coefficients[,5] # p-value column
+        save_covs <- p_vals[p_vals < 0.05] %>% names()
+        save_covs <- save_covs %>% str_replace_all("sex2", "sex") # only keep covariates with p-value < 0.05
+        updated_cov_vec <- save_covs[!(save_covs %in% c("(Intercept)"))] # dont want intercept
+        
+        fin_formula <-
+          paste0("cur_outcome ~ ", 
+                 paste0(updated_cov_vec, sep = " + ", collapse = ""),
+                 "cur_predictor + (1 | id)"
+                 )
+        final_mem <- lmer(fin_formula)
+       # tidy_mem <- final_mem %>% texreg()
+        mod_sum <- summary(final_mem)
+        
+        # save model summary output in list
+        mod_sum_output <- capture.output(summary(final_mem))
+        
+        # extract relevant portions of summary output
+        first_ind <- mod_sum_output %>% match("Fixed effects:")
+        last_ind <- mod_sum_output %>% match("Correlation of Fixed Effects:")
+        
+        mod_sum_output_trunc <-
+          mod_sum_output[(which(first_ind == 1) + 1):(which(last_ind == 1) - 2)]
+        
+        # replace "cur_predictor" with current predictor name
+         
+         
+        mod_sum_pred_row <- mod_sum_output_trunc %>% str_locate("cur_predictor")
+        mod_sum_output_trunc[which(mod_sum_pred_row[,1] == 1)] <- 
+          str_replace(mod_sum_output_trunc[which(mod_sum_pred_row[,1] == 1)],
+                      "cur_predictor",
+                      str_trunc(paste0(pred_name, "             "), 13, side = "right", ellipsis = ""))
+        
+        mod_sum_coef <- mod_sum$coefficients
+        mod_estimates <- mod_sum_coef[,1]
+        pred_p_val <- mod_sum_coef["cur_predictor", 5]
+        
+        cur_tib <-
+          tibble(
+            predictor = pred_name,
+            outcome = outcome_name,
+            model_sum = list(mod_sum_output_trunc),
+            model_summary = list(mod_sum_coef),
+            model_estimates = list(mod_estimates),
+            predictor_pval = pred_p_val %>% round(digits = 3),
+            sig = if_else(predictor_pval < 0.05, "***", "")
+            
+          )
+        
+        outcome_tib <- outcome_tib %>% bind_rows(cur_tib)
+    }
+  }
+  return(outcome_tib)
+}
+
+write_mod <- function(pred = test$predictor, 
+                      out = test$outcome, 
+                      mod_sum = test$model_estimates){
+  
+  new_names <- 
+    mod_sum %>% 
+    unlist() %>%
+    names() %>% 
+    str_replace_all("cur_predictor", pred) %>%
+    str_replace_all('\\(Intercept\\)',"") %>% toupper()
+  
+  new_vals <- 
+    mod_sum %>% 
+    unlist() %>%
+    round(digits = 4) 
+  
+  rhs <- tibble(
+    name = new_names,
+    vals = new_vals
+  ) %>%
+    mutate(
+      sign = sign(vals),
+      new_vals = abs(vals),
+      new_term = ifelse(name == "", 
+                        ifelse(sign == 1, paste(new_vals), paste("-", new_vals)), 
+                       ifelse(sign == 1, 
+                              paste0(" + ", new_vals, "(", name, ")"), 
+                              paste0(" - ", new_vals, "(", name, ")")))
+    ) %>% pull(new_term) %>% paste(collapse = "")
+  
+  lhs <- out %>% toupper()
+  fin_mod <- paste0(lhs, " = ", rhs)
+return(fin_mod)
+}
+
+do_write_mods <- function(df) {
+  
+ fin_df <- df %>% 
+  mutate(
+    fin_mods = pmap(list(predictor, outcome, model_sum), new_write_mods)
+  ) %>%
+  select(predictor, outcome, fin_mods, predictor_pval, sig) %>%
+  unnest(fin_mods)
+ 
+ return(fin_df)
+}
+
+diet_sleep_models <- loop_models(outs1, preds1, covs1)
+
+for (i in 1:nrow(diet_sleep_models)) {
+  cur_df <- diet_sleep_models[i,]
+  writeLines(paste0("Model ", i, ": ", cur_df$outcome, " vs. ", cur_df$predictor))
+  writeLines(unlist(lapply(cur_df$model_sum, paste)))
+  writeLines("\n")
+}
+```
+
+\newpage
+
+### Sleep and Diet
+
+The following table presents the results of regressing diet outcome variables on sleep predictors:
+
+```{r, echo = FALSE}
+sleep_diet <- readxl::read_excel("data/CM + DQ Study Diet and Sleep_8.24.2022_HB.xlsx", sheet = "Sleep-diet") %>%
+  janitor::clean_names() %>%
+  filter(
+    condition == "Aligned"
+  ) %>% 
+  mutate(
+    sex = as.factor(sex)
+  )
+
+outs2 <-
+  sleep_diet %>%
+  select(
+    en, food_wt_f, ed, 
+    prot, fat, cho, 
+    prot_plant, prot_ani, fiber,
+    ca, mg, na, sfa, ufa, 
+    fruit, veg, f_v,
+    egg, dairy, 
+    added_sugar
+  )
+
+covs2 <-
+  sleep_diet %>%
+  select(
+    sex, age, bmi, id
+  )
+
+preds2 <- 
+  sleep_diet %>%
+  select(
+    se,
+    tst,
+    waso, 
+    sfi
+  )
+
+sleep_diet_models <- loop_models(outs2, preds2, covs2)
+
+for (i in 1:nrow(sleep_diet_models)) {
+  cur_df <- sleep_diet_models[i,]
+  writeLines(paste0("Model ", i, ": ", cur_df$outcome, " vs. ", cur_df$predictor))
+  writeLines(unlist(lapply(cur_df$model_sum, paste)))
+  writeLines("\n")
+}
+```
+
+\newpage
+
+## GitHub Repository
+
+All code for this report can be found in [this Github repository](https://github.com/waveley/diet_sleep).
+
+

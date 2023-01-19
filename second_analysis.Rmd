@@ -81,11 +81,16 @@ In all models constructed, phase (coded as a factor variable, taking in values 1
 The results of regressing diet outcome variables on condition, week, the interaction of condition and week, energy (if applicable), and phase (if determined to be a significant predictor) are as follows:
 
 ```{r, echo = FALSE}
-diet <- readxl::read_excel("data/CM Study Diet and Sleep_10.5.2022_HB.xlsx", sheet = "Diet") %>%
+diet1 <- readxl::read_excel("data/CM Study Diet and Sleep_10.5.2022_HB.xlsx", sheet = "Diet") %>%
   janitor::clean_names() %>%
   mutate(
     sex = as.factor(sex),
     phase = as.factor(phase)
+  )
+diet2 <- readxl::read_excel("data/CM + DQ Study Diet and Sleep_Added Diet Variables and HEI_12.14.2022.xlsx", sheet = "Diet-sleep") %>%
+  janitor::clean_names() %>%
+  mutate(
+    sex = as.factor(sex)
   )
 
 outs1 <-
