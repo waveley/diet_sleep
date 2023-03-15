@@ -23,9 +23,9 @@ data dq_cm;
 	set dq_cm;
 	vtotalleg = v_total + v_legumes;
 	vdrkgrleg = v_drkgr + v_legumes;
-	fwholefrt = f_total - f_juice;
-	pfallprotleg = pf_total + pf_legumes;
-	pfseaplantleg = seafood + pf_soy + pf_nutsds + pf_legumes;
+	fwholefrt = f_citmlb + f_other;
+	pfallprotleg = pf_mps_total + pf_eggs + pf_nutsds + pf_soy + pf_legumes;
+	pfseaplantleg = pf_seafd_hi + pf_seafd_low + pf_soy + pf_nutsds + pf_legumes;
 	monopoly = mfat + pfat;
 run;
  
